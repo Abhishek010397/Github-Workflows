@@ -1,0 +1,97 @@
+name: build-jar
+description: Steps Needed For Building JAR
+inputs:
+  GITHUB_REPOSITORY:
+    description: "Name of the Application Code Repository"
+    required: false
+  JAVA_VERSION:
+    required: true
+  TOKEN:
+    reuired: true
+  REF:
+    required: true
+  PATH:
+   required: true
+  PERSISTENT_CREDENTIALS:
+    required: true
+  CACHE_NAME:
+    required: true
+  NEXUS_USERNAME:
+    required: true
+  NEXUS_PASS:
+    required: true
+  aws-region:
+    required: true
+  aws-access-key-id:
+    required: true
+  aws-secret-access-key:
+    required: true
+  IMAGE_TAG:
+    required: true
+  ECR_REPOSITORY:
+    required: true
+  DOCKERFILE_DIRECTORY_NAME:
+    required: true
+  APPLICATION_NAME:
+    required: true
+  CODE_DIRECTORY_NAME:
+    default: '**'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-java@v1
+      with:
+        java-version: ${{ inputs.JAVA_VERSION }}
+    - uses: actions/checkout@v2
+      with:
+        repository: ${{ inputs.GITHUB_REPOSITORY}}
+        token: ${{ inputs.TOKEN }}
+        ref: ${{ inputs.REF }}
+        persist-credentials: ${{ inputs.PERSISTENT_CREDENTIALS }}
+        path: ${{ inputs.PATH }}
+    - uses: actions/cache@v2
+      env:
+        cache-name: ${{ inputs.CACHE_NAME}}
+      with:
+        path: ~/.m2
+        key: ${{ env.cache-name }}-${{ hashFiles('**/pom.xml') }}
+    - name: Building JAR
+      shell: bash
+      env:
+        NEXUS_USERNAME: ${{ inputs.NEXUS_USERNAME }}
+        NEXUS_PASSWORD: ${{ inputs.NEXUS_PASS }}
+      run: |
+        rm -rf ~/.m2/repository/tv/pluto/nile/
+        cd /home/runner/work
+        mvn -B -s settings.xml clean package
+        sudo apt update
+        sudo apt install rename
+        shopt -s globstar
+        rm -f ${{ inputs.CODE_DIRECTORY_NAME }}/target/*.original
+        rename 's/-(\d+)(\.\d+)(\.\d+)(-SNAPSHOT)?//g' ${{ inputs.CODE_DIRECTORY_NAME }}/target/*.jar
+        cp ${{ inputs.CODE_DIRECTORY_NAME }}/target/*.jar /tmp
+    - uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: ${{ inputs.aws-region }}
+    - id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    - name: Build, tag, and push image to Amazon ECR
+      shell : bash
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+      run: |
+        cd /home/runner/work/de-nile-deployment/de-nile-deployment/de-nile-collector
+        export container_githubsha=`git rev-parse HEAD`
+        echo "github SHA: $container_githubsha"
+        echo "::set-output name=github_sha::$container_githubsha"
+        cd -
+        cd ${{ inputs.DOCKERFILE_DIRECTORY_NAME }}
+        cp /tmp/${{ inputs.APPLICATION_NAME }}.jar .
+        docker build -t ${{ inputs.ECR_REPOSITORY }} . --build-arg GITHUB_SHA=$container_githubsha
+        docker tag ${{ inputs.ECR_REPOSITORY }}:latest $ECR_REGISTRY/${{ inputs.ECR_REPOSITORY }}:$container_githubsha
+        docker push $ECR_REGISTRY/${{ inputs.ECR_REPOSITORY }}:$container_githubsha

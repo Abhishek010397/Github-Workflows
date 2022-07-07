@@ -1,0 +1,59 @@
+name: prereq-create-ecr
+description: "Creating ECR"
+inputs:
+  service:
+    required: true
+  ecr-repository:
+    description: "name of ECR Repository"
+    required: true
+  ref:
+    description: "Branch Name"
+    required: true
+  presistent-credentials:
+    required: true
+  path:
+    required: true
+  aws-region:
+    required: true
+  token:
+    required: true
+  aws-access-key-id:
+    required: true
+  aws-secret-access-key:
+    required: true
+
+
+runs:
+  using: "composite"
+  steps:
+    - uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: ${{ inputs.aws-region }}
+    - uses: actions/checkout@v2
+    - name: set env vars
+      shell: bash
+      run: |
+          echo ECR_REPOSITORY=$(echo ${{ inputs.ecr-repository }} | tr 'A-Z' 'a-z') >> $GITHUB_ENV
+          # we can't use the environment context as the default, but we can access it fine here...
+          if [ "${{ inputs.service }}x" == "x" ] ; then
+            echo SVC_NAME=$SERVICE_NAME >> $GITHUB_ENV
+          else
+            echo SVC_NAME=${{ inputs.service }} >> $GITHUB_ENV
+          fi
+    - name: Create ECR repo
+      shell: bash
+      run: |
+        export repo="$ECR_REPOSITORY"
+        aws ecr describe-repositories --repository-names ${{ inputs.ecr-repository }} || \
+          aws ecr create-repository \
+            --repository-name ${{ inputs.ecr-repository }} \
+            --tags Key=src_repo,Value=${{ github.repository }} \
+                    Key=responsible,Value=abhishek \
+            --image-scanning-configuration scanOnPush=true # && \
+        aws ecr set-repository-policy \
+          --repository-name ${{ inputs.ecr-repository }} \
+          --policy-text file://deploy/ecr-repo-policy.json
+        # save the repo name for use in later jobs
+        echo "::set-output name=ecr-repo-name::${{ inputs.ecr-repository }}"

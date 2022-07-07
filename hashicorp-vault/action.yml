@@ -1,0 +1,23 @@
+name: hashicorp-vault
+
+inputs:
+  url:
+    required: true
+  token:
+    required: true
+  cluster:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: hashicorp/vault-action@v2.1.0
+      with:
+        url: ${{ inputs.url}}
+        token: ${{ inputs.token }}
+        secrets: |
+          secret/data/data/clusters/${{ inputs.cluster }} endpoint | K8S_ENDPOINT ;
+          secret/data/data/clusters/${{ inputs.cluster }} region | K8S_REGION ;
+          secret/data/data/clusters/${{ inputs.cluster }} secret | K8S_SECRET ;
+          secret/data/data/clusters/${{ inputs.cluster }} token | K8S_TOKEN ;
+          secret/data/data/clusters/${{ inputs.cluster }} ca_data | K8S_CA_DATA

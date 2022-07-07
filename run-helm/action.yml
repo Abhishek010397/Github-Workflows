@@ -1,0 +1,30 @@
+name: run-helm
+description: Steps Needed For Deploying Chart
+inputs:
+  namespace:
+    required: true
+  env:
+    required: true
+  HELM_SERVICE_NAME:
+    required: true
+  chart_name:
+    required: true
+  image_tag:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      name: RUN HELM
+      run: |
+        echo ${{ inputs.image_tag }}
+        pwd
+        ls
+        helm upgrade --install \
+          --namespace "${{ inputs.namespace }}" \
+          --values ${{ inputs.chart_name }}/values-${{ inputs.env }}.yaml \
+          --set image.tag=${{ inputs.image_tag }} \
+          ${{ inputs.HELM_SERVICE_NAME }} \
+          ./${{ inputs.chart_name }}/
+

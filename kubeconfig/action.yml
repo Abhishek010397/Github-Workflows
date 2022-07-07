@@ -1,0 +1,14 @@
+name: "Setup kubeconfig file"
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      name: Setup KubeConfig file
+      run: |
+        set -x
+        kubectl config set-cluster cicd --server ${K8S_ENDPOINT}
+        kubectl config set clusters.cicd.certificate-authority-data ${K8S_CA_DATA}
+        kubectl config set-credentials cicd --token ${K8S_TOKEN}
+        kubectl config set-context cicd --cluster=cicd --user=cicd
+        kubectl config set current-context cicd

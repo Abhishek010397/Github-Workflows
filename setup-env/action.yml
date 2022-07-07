@@ -1,0 +1,49 @@
+name: "Setup common environment variables"
+
+inputs:
+  k8n-namespace-suffix:
+    required: true
+  k8n-namespace:
+    required: false
+  enricher-app-name:
+    required: false
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      name: set env vars
+      run: |
+        export BRANCH_NAME=${GITHUB_REF#*refs/heads/}
+        export BRANCH_NAME_LOWER=${BRANCH_NAME,,}
+
+        if [ "$BRANCH_NAME_LOWER" == "master" ] || [ "$BRANCH_NAME_LOWER" == "main" ]; then
+          if [ -n "${{ inputs.k8n-namespace }}" ]; then
+            export K8S_NAMESPACE=${{ inputs.k8n-namespace }}
+          else
+            export K8S_NAMESPACE=${{ inputs.k8n-namespace-suffix }}
+          fi
+
+          if [ -n "${{ inputs.enricher-app-name }}" ]; then
+            export ENRICHER_APP_NAME=${{ inputs.enricher-app-name }}
+          fi
+        else
+          if [ -n "${{ inputs.k8n-namespace }}" ]; then
+            export K8S_NAMESPACE=${{ inputs.k8n-namespace }}
+          else
+            export K8S_NAMESPACE=$BRANCH_NAME_LOWER-${{ inputs.k8n-namespace-suffix }}
+          fi
+
+          if [ -n "${{ inputs.enricher-app-name }}" ]; then
+            export ENRICHER_APP_NAME=${{ inputs.enricher-app-name }}
+          else
+            export ENRICHER_APP_NAME=snowplow-kafka-enricher-$BRANCH_NAME_LOWER
+          fi
+        fi
+
+        echo "BRANCH_NAME=$BRANCH_NAME_LOWER" >> $GITHUB_ENV
+        echo "K8S_NAMESPACE=$K8S_NAMESPACE" >> $GITHUB_ENV
+        echo "ENRICHER_APP_NAME=$ENRICHER_APP_NAME" >> $GITHUB_ENV
+
+        if [ -n "$ENRICHER_APP_NAME" ]; then
+          echo "HELM_OPTS=--set configValues.ENRICHER_APP_NAME=$ENRICHER_APP_NAME" >> $GITHUB_ENV
+        fi
