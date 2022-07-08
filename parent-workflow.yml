@@ -5,19 +5,15 @@ on:
     inputs:
       environment:
         type: environment
-        description: "Select the environment you want to deploy"
         required: true
-        default: sandbox
-      de-nile-app-branch:
-        description: "App's sources branch eg. 'refs/heads/'"
+        default: testing
+      app-branch:
         required: true
         default: refs/heads/master
       helm-service-name:
-        description: "provide the helm service name for helm chart"
         required: true
-        default: spluto-collector
+        default: my-service
       k8s-namespace:
-        description: "Kubernetes namespace used to deploy App"
         required: false
     secrets:
       token:
