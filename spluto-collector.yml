@@ -1,0 +1,67 @@
+name: spluto-collector
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: environment
+        description: "Select the environment you want to deploy"
+        required: true
+        default: sandbox
+      de-nile-app-branch:
+        description: "App's sources branch eg. 'refs/heads/'"
+        required: true
+        default: refs/heads/master
+      helm-service-name:
+        description: "provide the helm service name for helm chart"
+        required: true
+        default: spluto-collector
+      k8s-namespace:
+        description: "Kubernetes namespace used to deploy App"
+        required: false
+    secrets:
+      token:
+        required: true
+      aws-access-key-id:
+        required: true
+      aws-secret-access-key:
+        required: true
+      NEXUS_USERNAME:
+        required: true
+      NEXUS_PASS:
+        required: true
+      vault_url:
+        required: true
+      vault_token:
+        required: true 
+
+jobs:
+  create-build-release:
+    uses: ./.github/workflows/deployment.yml
+    with:
+      aws-region: us-east-1 
+      ecr-repository: aws/my-ecr
+      JAVA_VERSION: 17
+      GITHUB_REPOSITORY: github/my-repo
+      REF: ${{ github.event.inputs.de-nile-app-branch }}
+      PERSISTENT_CREDENTIALS: 'false'
+      PATH: myPath
+      CACHE_NAME: mvn.cache 
+      DOCKERFILE_DIRECTORY_NAME: mydocker-directory
+      APPLICATION_NAME: myApp
+      CODE_DIRECTORY_NAME: application-java
+      k8n-namespace: ${{ github.event.inputs.k8s-namespace }}
+      k8n-namespace-suffix: ns-suffix
+      cluster_name: aws-eks1
+      chart_name: myChart
+      target_env: ${{ github.event.inputs.environment }}
+      HELM_SERVICE_NAME: ${{ github.event.inputs.helm-service-name }}
+    secrets:
+      token: ${{ secrets.PLUTO_DEPLOY_TOKEN }}
+      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_ECR }}
+      aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_ECR }} 
+      NEXUS_USERNAME: ${{ secrets.NEXUS_USERID }}
+      NEXUS_PASS: ${{ secrets.NEXUS_PASSWORD }}
+      vault_url: ${{ secrets.VAULT_ADDRESS_DE_SANDBOX }}
+      vault_token: ${{ secrets.VAULT_TOKEN_DE_SANDBOX_RO }}
+

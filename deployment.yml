@@ -1,0 +1,148 @@
+name: create-build-release-pipeline
+
+on:
+  workflow_call:
+    inputs:
+      aws-region: 
+        required: true
+        type: string
+      ecr-repository: 
+        required: true
+        type: string
+      JAVA_VERSION: 
+        required: true 
+        type: number
+      GITHUB_REPOSITORY: 
+        required: true 
+        type: string
+      REF: 
+        required: true 
+        type: string
+      PERSISTENT_CREDENTIALS: 
+        required: true 
+        type: string
+      PATH: 
+        required: true 
+        type: string
+      CACHE_NAME: 
+        required: true  
+        type: string      
+      DOCKERFILE_DIRECTORY_NAME: 
+        required: true 
+        type: string
+      APPLICATION_NAME: 
+        required: true 
+        type: string
+      CODE_DIRECTORY_NAME: 
+        required: true 
+        type: string
+      k8n-namespace:
+        required: true 
+        type: string
+      k8n-namespace-suffix: 
+        required: true 
+        type: string
+      cluster_name: 
+        required: true 
+        type: string
+      chart_name: 
+        required: true 
+        type: string
+      target_env: 
+        required: true 
+        type: string
+      HELM_SERVICE_NAME: 
+        required: true 
+        type: string
+    secrets:
+      token:
+        required: true
+      aws-access-key-id:
+        required: true
+      aws-secret-access-key:
+        required: true
+      NEXUS_USERNAME:
+        required: true
+      NEXUS_PASS:
+        required: true
+      vault_url:
+        required: true
+      vault_token:
+        required: true 
+
+
+jobs:
+
+  create-ecr:
+    runs-on: ubuntu-latest
+    outputs:
+      ecr-repo-name: ${{ steps.create-ecr.outputs.ecr-repo-name }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/prereq-create-ecr
+        with:
+          aws-region: us-east-1
+          ecr-repository: ${{ inputs.ecr-repository }}
+          token: ${{ secrets.token }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+
+  build_image:
+    runs-on: ubuntu-latest
+    needs: create-ecr
+    outputs:
+      github_sha: ${{ steps.build-tag.outputs.github_sha }}
+    environment:
+      name: ${{ inputs.target_env }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/build-image
+        with:
+          JAVA_VERSION: ${{ inputs.JAVA_VERSION }}
+          GITHUB_REPOSITORY: ${{ inputs.GITHUB_REPOSITORY}}
+          TOKEN: ${{ secrets.token }}
+          REF: ${{ inputs.REF }}
+          PERSISTENT_CREDENTIALS: ${{ inputs.PERSISTENT_CREDENTIALS }}
+          PATH: ${{ inputs.PATH }}
+          CACHE_NAME: ${{ inputs.CACHE_NAME }}     
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ inputs.aws-region}}
+          IMAGE_TAG: ${{ github.sha }}
+          ECR_REPOSITORY: ${{ inputs.ecr-repository }}
+          DOCKERFILE_DIRECTORY_NAME: ${{ inputs.DOCKERFILE_DIRECTORY_NAME }}
+          APPLICATION_NAME: ${{ inputs.APPLICATION_NAME }}
+          CODE_DIRECTORY_NAME: ${{ inputs.CODE_DIRECTORY_NAME }}
+
+  deploy_helm_chart:
+    runs-on: ubuntu-latest
+    needs: build_image
+    environment:
+      name: ${{ inputs.target_env }}
+    strategy:
+      matrix:
+        cluster: [de-sandbox-dev-use1]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Env Variables
+        uses: ./.github/actions/setup-env
+        with:
+          k8n-namespace: ${{ inputs.k8n-namespace}}
+          k8n-namespace-suffix: ${{ inputs.k8n-namespace-suffix }}
+      - uses: ./.github/actions/hashicorp-vault
+        with: 
+          url: ${{ secrets.vault_url}}
+          token: ${{ secrets.vault_token }}
+          cluster: ${{ matrix.cluster }}
+      - uses: azure/setup-kubectl@v1
+      - uses: azure/setup-helm@v1
+      - uses: ./.github/actions/setup-kubeconfig
+      - uses: ./.github/actions/deploy-helm
+        with:
+          chart_name: ${{ inputs.chart_name }}
+          env: ${{ inputs.target_env }}
+          image_tag: ${{ needs.build_image.outputs.github_sha }}
+          HELM_SERVICE_NAME: ${{ inputs.HELM_SERVICE_NAME }}
+          namespace: ${{ inputs.k8n-namespace}}
