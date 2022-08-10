@@ -1,4 +1,4 @@
-name: spluto-collector
+name: my-workflow
 
 on:
   workflow_dispatch:
@@ -53,11 +53,11 @@ jobs:
       target_env: ${{ github.event.inputs.environment }}
       HELM_SERVICE_NAME: ${{ github.event.inputs.helm-service-name }}
     secrets:
-      token: ${{ secrets.PLUTO_DEPLOY_TOKEN }}
+      token: ${{ secrets.TOKEN }}
       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_ECR }}
       aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_ECR }} 
       NEXUS_USERNAME: ${{ secrets.NEXUS_USERID }}
       NEXUS_PASS: ${{ secrets.NEXUS_PASSWORD }}
-      vault_url: ${{ secrets.VAULT_ADDRESS_DE_SANDBOX }}
-      vault_token: ${{ secrets.VAULT_TOKEN_DE_SANDBOX_RO }}
+      vault_url: ${{ secrets.VAULT_ADDRESS }}
+      vault_token: ${{ secrets.VAULT_TOKEN }}
 
